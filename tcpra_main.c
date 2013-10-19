@@ -12,8 +12,9 @@
 int main(int argc, char **argv)
 {
       int i;
-      int fd_csv;
-      char csvbuf[64];
+      int cpt = 0;
+      int seq_nb;
+      FILE *csv;
       char errbuf[PCAP_ERRBUF_SIZE];
       pcap_t *pcap_file;
       struct pcap_pkthdr *header = malloc(sizeof(struct pcap_pkthdr));
@@ -27,12 +28,12 @@ int main(int argc, char **argv)
 	    /** On verifie l'extension qui doit etre .pcap **/
 	    if (!verify_pcap(filename))
 	    {
-		  printf("%s n'est pas un .pcap\n",argv[i]);
+		  printf("%s n'est pas un .pcap\n",filename);
 		  return -1;
 	    }
 
 	    /** On ouvre le fichier .pcap **/
-	    pcap_file = pcap_open_offline((const char *) argv[i], errbuf);
+	    pcap_file = pcap_open_offline((const char *) filename, errbuf);
 	    if ( pcap_file == NULL)
 	    {
 		  perror(errbuf);
@@ -40,27 +41,26 @@ int main(int argc, char **argv)
 	    }
 
 	     /** File descriptor du .csv à remplir lors de l'analyse **/
-	    fd_csv = create_csv_file(argv[i]);
+	    csv = create_csv_file(filename);
 
 
-	    while ( (packet = pcap_next(pcap_file, header)) != NULL )
+	    while ( (packet = pcap_next(pcap_file, header)) != NULL && cpt < 10)
 	    {
-		  if ( ip_after_mac(packet) == 0 || tcp_after_ipv6(packet) == 0 )
+		  seq_nb = get_sequence_number(packet);
+		  if (seq_nb == -1)
 		  {
-			perror("paquet invalide !\n");
+			perror("Paquet invalide");
+			continue;
 		  }
-		  else
-		  {
-			sprintf(csvbuf, "%d\n", get_sequence_number(packet));
-			printf("%s\n",csvbuf);
-			write(fd_csv, csvbuf, sizeof(tcp_seq)+1);
-		  }
+		  cpt++;
+		  fprintf(csv, "%d\n", seq_nb);
 	    }
 			 
 
 	    pcap_close(pcap_file);
       }
-      
+	    
+      fclose(csv);
       free(header);
       return 0;
 }

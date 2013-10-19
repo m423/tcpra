@@ -19,12 +19,14 @@
 #define IP6_HDR_LEN 0x28
 
 int verify_pcap( const char * );
-int create_csv_file( const char * );
+FILE *create_csv_file( const char * );
 
 int ip_after_mac( const u_char * );
 int tcp_after_ip( const u_char * );
 int tcp_after_ipv6( const u_char * );
 
+int valid_packet( const u_char * );
 tcp_seq get_sequence_number( const u_char * );
+tcp_seq get_sequence_number_ipv6( const u_char * );
 
 #endif 

@@ -13,36 +13,40 @@ int verify_pcap( const char *filename )
 }
 
 
-int create_csv_file( const char *filename )
+FILE *create_csv_file( const char *filename )
 {
-      int fd_csv;
+      FILE *csv;
       char *csv_file_name = malloc(sizeof(filename));
       strcpy(csv_file_name, filename);
       char *p = strrchr(csv_file_name,'.' );
       if ( p == NULL) 
-	    return -1;
+      {
+	    perror("create csv file");
+      }
       strcpy(p, ".csv");
-      fd_csv = open(csv_file_name, O_WRONLY|O_CREAT|O_TRUNC,S_IRUSR|S_IWUSR|S_IRGRP);
-      if (fd_csv < 0)
+      csv = fopen(csv_file_name, "w+");
+      if (csv == NULL)
       {
 	    perror("create csv file");
       }
       free(csv_file_name);
-      return fd_csv;
+      return csv;
 }
 
 int ip_after_mac( const u_char *packet )
 {
       struct ether_header *header = (struct ether_header *)packet;
-      return ( header->ether_type == ntohs(ETHERTYPE_IP) ||
-	       header->ether_type == ntohs(ETHERTYPE_IPV6) );
+      if ( header->ether_type == ntohs(ETHERTYPE_IP) )
+	    return 1;
+      if ( header->ether_type == ntohs(ETHERTYPE_IPV6) )
+	    return 2;
+      return 0;
 }
 
 int tcp_after_ip( const u_char *packet )
 {
       struct ip *header = (struct ip *)(packet + ETHER_HDR_LEN);
-       printf(" Protocole apres ip_header : %d \n", header->ip_p);
-       return ( header->ip_p == 0x06 );
+      return ( header->ip_p == 0x06 );
 
 }
 
@@ -53,9 +57,32 @@ int tcp_after_ipv6( const u_char *packet )
 
 }
 
-tcp_seq get_sequence_number( const u_char *packet )
+int valid_packet( const u_char *packet )
 {
+      switch (ip_after_mac(packet))
+      {
+      case 1:
+	    if (tcp_after_ip(packet)) return 1;
+      case 2:
+	    if (tcp_after_ipv6(packet)) return 2;
+      default:
+	    return 0;
+      }
+}
+
+tcp_seq get_sequence_number( const u_char *packet)
+{
+      size_t ip_hdr = 0;
+      int valid = valid_packet(packet);
+
+      if (!valid) 
+	    return -1;
+      if (valid == 1) 
+	    ip_hdr = IP_HDR_LEN;
+      if (valid == 2)
+	    ip_hdr = IP6_HDR_LEN;
+	    
       struct tcphdr *header = 
-	    (struct tcphdr *)(packet + (ETHER_HDR_LEN + IP6_HDR_LEN));
+	    (struct tcphdr *)(packet + (ETHER_HDR_LEN + ip_hdr));
       return header->th_seq;
 }
