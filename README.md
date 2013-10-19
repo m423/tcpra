@@ -1,8 +1,7 @@
-#=======================|
-tcpra			              |
-#=======================|
-TCP REORDERING ANALYSIS	|
-#=======================|
+#=======
+tcpra
+TCP REORDERING ANALYSIS
+#======
 
 #=================================================|
 @author Romain Duperré, duperre@polytech.unice.fr |
