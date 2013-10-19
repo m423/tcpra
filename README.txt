@@ -6,7 +6,7 @@ TCP REORDERING ANALYSIS	|
 
 #=================================================|
 @author Romain Duperré, duperre@polytech.unice.fr |
-	Paul Lavoine, lavoine@polyecth.unice.fr   |
+	Paul Lavoine, lavoine@polytech.unice.fr   |
 #=================================================|
 
 #==================================================
