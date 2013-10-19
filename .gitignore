@@ -16,3 +16,10 @@
 *.exe
 *.out
 *.app
+
+#Capture Files
+cap/*
+*.pcap
+
+#Downloaded Files
+*.iso
