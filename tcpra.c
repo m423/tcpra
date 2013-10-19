@@ -98,12 +98,12 @@ struct tcphdr *get_tcphdr( const u_char *packet )
       
 }
 
-u_int32_t get_sequence_number( const struct tcphdr *header )
+tcp_seq get_sequence_number( const struct tcphdr *header )
 {
       return htonl(header->th_seq);
 }
 
-u_int32_t get_next_sequence_number( const u_char *packet , const struct tcphdr *tcph )
+tcp_seq get_next_sequence_number( const u_char *packet , const struct tcphdr *tcph )
 {
       u_int8_t offset = tcph->th_off * 4;      
       u_int16_t plen;

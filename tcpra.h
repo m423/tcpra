@@ -29,7 +29,7 @@ int tcp_after_ipv6( const u_char * );
 
 int valid_packet( const u_char * );
 struct tcphdr *get_tcphdr( const u_char * );
-u_int32_t get_sequence_number( const struct tcphdr * );
-u_int32_t get_next_sequence_number( const u_char * , const struct tcphdr * );
+tcp_seq get_sequence_number( const struct tcphdr * );
+tcp_seq get_next_sequence_number( const u_char * , const struct tcphdr * );
 
 #endif 

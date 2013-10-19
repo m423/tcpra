@@ -8,7 +8,7 @@ int main(int argc, char **argv)
 {
       int i;
       int current_seq_nb;
-      int expected_seq_nb;
+      int expected_seq_nb = 0;
       FILE *csv;
       char errbuf[PCAP_ERRBUF_SIZE];
       pcap_t *pcap_file;
@@ -44,20 +44,26 @@ int main(int argc, char **argv)
 	    {
 		  tcp_header = get_tcphdr(packet);
 		  current_seq_nb = get_sequence_number(tcp_header);
-		  expected_seq_nb = get_next_sequence_number(packet ,tcp_header);
 
-		  if (current_seq_nb == -1)
+		  if (expected_seq_nb == 0) // pour initialisation
+			expected_seq_nb = current_seq_nb;
+
+		  if (current_seq_nb == -1 || expected_seq_nb == -1)
 		  {
 			perror("Paquet invalide");
 			continue;
 		  }
-		  fprintf(csv, "current: %d , expected: %d\n", current_seq_nb, expected_seq_nb);
+
+		  if ( current_seq_nb != expected_seq_nb )
+			fprintf(csv, "current: %d , expected: %d\n", current_seq_nb, expected_seq_nb);
+		  
+		  expected_seq_nb = get_next_sequence_number(packet ,tcp_header);
 	    }
 			 
 
 	    pcap_close(pcap_file);
+	    fclose(csv);
       }
-      fclose(csv);
       free(pktheader);
       return 0;
 }
