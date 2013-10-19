@@ -45,8 +45,8 @@ int ip_after_mac( const u_char *packet )
 
 int tcp_after_ip( const u_char *packet )
 {
-      struct ip *header = (struct ip *)(packet + ETHER_HDR_LEN);
-      return ( header->ip_p == 0x06 );
+      struct iphdr *header = (struct iphdr *)(packet + ETHER_HDR_LEN);
+      return ( header->protocol == 0x06 );
 
 }
 
@@ -56,6 +56,18 @@ int tcp_after_ipv6( const u_char *packet )
       return ( header->ip6_nxt == 0x06 );
 
 }
+
+uint16_t get_ip6_plen( const u_char *packet )
+{
+      struct ip6_hdr *header = (struct ip6_hdr *)(packet + ETHER_HDR_LEN);
+      return header->ip6_plen;
+}
+
+uint16_t get_ip_plen( const u_char *packet )
+{
+      struct iphdr *header = (struct iphdr *)(packet + ETHER_HDR_LEN);
+      return header->tot_len;
+} 
 
 int valid_packet( const u_char *packet )
 {
@@ -70,21 +82,43 @@ int valid_packet( const u_char *packet )
       }
 }
 
-tcp_seq get_sequence_number( const u_char *packet)
+struct tcphdr *get_tcphdr( const u_char *packet )
 {
       size_t ip_hdr = 0;
       int valid = valid_packet(packet);
 
       if (!valid) 
-	    return -1;
-      if (valid == 1){
+	    return NULL;
+      if (valid == 1)
 	    ip_hdr = IP_HDR_LEN;
-	    printf("ipv6 !!\n");
-      }
       if (valid == 2)
 	    ip_hdr = IP6_HDR_LEN;
 	    
-      struct tcphdr *header = 
-	    (struct tcphdr *)(packet + (ETHER_HDR_LEN + ip_hdr));
-      return header->th_seq;
+      return (struct tcphdr *)(packet + (ETHER_HDR_LEN + ip_hdr));
+      
+}
+
+u_int32_t get_sequence_number( const struct tcphdr *header )
+{
+      return htonl(header->th_seq);
+}
+
+u_int32_t get_next_sequence_number( const u_char *packet , const struct tcphdr *tcph )
+{
+      u_int8_t offset = tcph->th_off * 4;      
+      u_int16_t plen;
+
+      switch (ip_after_mac(packet))
+      {
+      case 1:
+	    plen = htons(get_ip_plen(packet));
+	    break;
+      case 2:
+	    plen = htons(get_ip6_plen(packet));
+	    break;
+      default:
+	    return -1;
+      }
+      return get_sequence_number(tcph)+ (plen - offset);
+      
 }

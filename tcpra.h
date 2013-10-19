@@ -10,6 +10,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
+#include <unistd.h>
+#include <pcap.h>
 #include <net/ethernet.h>
 #include <netinet/ip.h>
 #include <netinet/ip6.h>
@@ -26,7 +28,8 @@ int tcp_after_ip( const u_char * );
 int tcp_after_ipv6( const u_char * );
 
 int valid_packet( const u_char * );
-tcp_seq get_sequence_number( const u_char * );
-tcp_seq get_sequence_number_ipv6( const u_char * );
+struct tcphdr *get_tcphdr( const u_char * );
+u_int32_t get_sequence_number( const struct tcphdr * );
+u_int32_t get_next_sequence_number( const u_char * , const struct tcphdr * );
 
 #endif 

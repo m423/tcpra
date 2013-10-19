@@ -2,23 +2,19 @@
 /** TCP Reordering Analysis **/
 /** Un outil pour analyser les problemes d'ordre d'arrivee des paquets TCP **/
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <pcap.h>
-
 #include "tcpra.h"
 
 int main(int argc, char **argv)
 {
       int i;
-      int cpt = 0;
-      int seq_nb;
+      int current_seq_nb;
+      int expected_seq_nb;
       FILE *csv;
       char errbuf[PCAP_ERRBUF_SIZE];
       pcap_t *pcap_file;
-      struct pcap_pkthdr *header = malloc(sizeof(struct pcap_pkthdr));
       const u_char *packet;
+      struct pcap_pkthdr *pktheader = malloc(sizeof(struct pcap_pkthdr));
+      struct tcphdr *tcp_header;
 
       for ( i = 1; i < argc; ++i)
       {
@@ -40,30 +36,28 @@ int main(int argc, char **argv)
 		  return -1;
 	    }
 
-	     /** File descriptor du .csv à remplir lors de l'analyse **/
+	    /** File descriptor du .csv à remplir lors de l'analyse **/
 	    csv = create_csv_file(filename);
 
 
-	    while ( (packet = pcap_next(pcap_file, header)) != NULL && cpt < 3)
+	    while ( (packet = pcap_next(pcap_file, pktheader)) != NULL)
 	    {
-		  seq_nb = get_sequence_number(packet);
-		  printf("%d\n",htonl(seq_nb));
-		  printf("%d\n",ntohl(seq_nb));
-		  printf("%d\n",seq_nb);
-		  printf("------\n");
-		  if (seq_nb == -1)
+		  tcp_header = get_tcphdr(packet);
+		  current_seq_nb = get_sequence_number(tcp_header);
+		  expected_seq_nb = get_next_sequence_number(packet ,tcp_header);
+
+		  if (current_seq_nb == -1)
 		  {
 			perror("Paquet invalide");
 			continue;
 		  }
-		  cpt++;
-		  fprintf(csv, "%d\n", htonl(seq_nb));
+		  fprintf(csv, "current: %d , expected: %d\n", current_seq_nb, expected_seq_nb);
 	    }
 			 
 
 	    pcap_close(pcap_file);
       }
       fclose(csv);
-      free(header);
+      free(pktheader);
       return 0;
 }
