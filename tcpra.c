@@ -77,8 +77,10 @@ tcp_seq get_sequence_number( const u_char *packet)
 
       if (!valid) 
 	    return -1;
-      if (valid == 1) 
+      if (valid == 1){
 	    ip_hdr = IP_HDR_LEN;
+	    printf("ipv6 !!\n");
+      }
       if (valid == 2)
 	    ip_hdr = IP6_HDR_LEN;
 	    

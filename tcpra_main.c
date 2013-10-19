@@ -44,22 +44,25 @@ int main(int argc, char **argv)
 	    csv = create_csv_file(filename);
 
 
-	    while ( (packet = pcap_next(pcap_file, header)) != NULL && cpt < 10)
+	    while ( (packet = pcap_next(pcap_file, header)) != NULL && cpt < 3)
 	    {
 		  seq_nb = get_sequence_number(packet);
+		  printf("%d\n",htonl(seq_nb));
+		  printf("%d\n",ntohl(seq_nb));
+		  printf("%d\n",seq_nb);
+		  printf("------\n");
 		  if (seq_nb == -1)
 		  {
 			perror("Paquet invalide");
 			continue;
 		  }
 		  cpt++;
-		  fprintf(csv, "%d\n", seq_nb);
+		  fprintf(csv, "%d\n", htonl(seq_nb));
 	    }
 			 
 
 	    pcap_close(pcap_file);
       }
-	    
       fclose(csv);
       free(header);
       return 0;
