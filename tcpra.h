@@ -45,7 +45,7 @@ typedef struct packet_late
 
 packet_late *init_late();
 packet_late *insert_packet_late( packet_late *, long, int );
-packet_late *search_packet_late(packet_late *, packet_late *, long);
+int search_packet_late(packet_late *, packet_late *, long);
 int remove_packet_late( packet_late *, long );
 int free_all_packet_late( packet_late * );
 void print_packet_late(packet_late *);

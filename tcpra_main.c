@@ -1,7 +1,7 @@
 /***** Fichier: tcpra_main.c *****/
 /** TCP Reordering Analysis **/
 /** Un outil pour analyser les problemes d'ordre d'arrivee des paquets TCP **/
-
+#include <assert.h>
 #include "tcpra.h"
 
 int main(int argc, char **argv)
@@ -10,7 +10,7 @@ int main(int argc, char **argv)
       long current_seq_nb;
       long expected_seq_nb = 0;
       int p_nb = 0;
-      packet_late *begin = init_late();
+      packet_late *begin;
       packet_late *searched = malloc(sizeof(struct packet_late));
 
       FILE *csv;
@@ -23,7 +23,7 @@ int main(int argc, char **argv)
 
       for ( i = 1; i < argc; ++i)
       {
-	    
+	    begin = init_late();
 	    char *filename = argv[i];
 	    
 	    /** On verifie l'extension qui doit etre .pcap **/
@@ -67,11 +67,11 @@ int main(int argc, char **argv)
 			      perror("sauvegarde paquet impossible\n");
 			      break;
 			}
-			search_packet_late(searched, begin, current_seq_nb);
-			if (searched != NULL)
+			if (search_packet_late(searched, begin, current_seq_nb))
 			{
+			      assert( current_seq_nb == searched->p_sequence );
 			      fprintf(csv, "%ld, %d\n", searched->p_sequence, (p_nb-searched->expected_at));
-			      if ( remove_packet_late(begin, searched->p_sequence) == -1)
+			      if ( remove_packet_late(begin, current_seq_nb) == -1)
 			      {
 				    perror("erreur suppression");
 			      }
@@ -84,6 +84,7 @@ int main(int argc, char **argv)
 	    pcap_close(pcap_file);
 	    fclose(csv);
       }
+
       free(pktheader);
       free(searched);
       free_all_packet_late(begin);

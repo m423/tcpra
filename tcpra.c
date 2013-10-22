@@ -165,7 +165,7 @@ packet_late *insert_packet_late( packet_late *begin, long p_sequence, int expect
       return new;
 }
 
-packet_late *search_packet_late(packet_late *dst, packet_late *begin, long p_sequence)
+int search_packet_late(packet_late *dst, packet_late *begin, long p_sequence)
 {
       packet_late *p;
       for ( p = begin->next;
@@ -175,9 +175,10 @@ packet_late *search_packet_late(packet_late *dst, packet_late *begin, long p_seq
       if ( p != NULL)
       {
 	    *dst = *p;
-	    return dst;	    
+	    return 1;	    
       }
-      return NULL;
+      
+      return 0;
       
 }
 
