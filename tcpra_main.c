@@ -7,14 +7,19 @@
 int main(int argc, char **argv)
 {
       int i;
-      int current_seq_nb;
-      int expected_seq_nb = 0;
+      long current_seq_nb;
+      long expected_seq_nb = 0;
+      int p_nb = 0;
+      packet_late *begin = init_late();
+      packet_late *searched = malloc(sizeof(struct packet_late));
+
       FILE *csv;
       char errbuf[PCAP_ERRBUF_SIZE];
       pcap_t *pcap_file;
       const u_char *packet;
       struct pcap_pkthdr *pktheader = malloc(sizeof(struct pcap_pkthdr));
       struct tcphdr *tcp_header;
+
 
       for ( i = 1; i < argc; ++i)
       {
@@ -42,6 +47,8 @@ int main(int argc, char **argv)
 
 	    while ( (packet = pcap_next(pcap_file, pktheader)) != NULL)
 	    {
+		  ++p_nb;
+		  
 		  tcp_header = get_tcphdr(packet);
 		  current_seq_nb = get_sequence_number(tcp_header);
 
@@ -54,9 +61,22 @@ int main(int argc, char **argv)
 			continue;
 		  }
 
-		  if ( current_seq_nb != expected_seq_nb )
-			fprintf(csv, "current: %d , expected: %d\n", current_seq_nb, expected_seq_nb);
-		  
+		  if ( current_seq_nb != expected_seq_nb ){
+			if ( insert_packet_late(begin,expected_seq_nb,p_nb) == NULL)
+			{
+			      perror("sauvegarde paquet impossible\n");
+			      break;
+			}
+			search_packet_late(searched, begin, current_seq_nb);
+			if (searched != NULL)
+			{
+			      fprintf(csv, "%ld, %d\n", searched->p_sequence, (p_nb-searched->expected_at));
+			      if ( remove_packet_late(begin, searched->p_sequence) == -1)
+			      {
+				    perror("erreur suppression");
+			      }
+			}
+		  }
 		  expected_seq_nb = get_next_sequence_number(packet ,tcp_header);
 	    }
 			 
@@ -65,5 +85,7 @@ int main(int argc, char **argv)
 	    fclose(csv);
       }
       free(pktheader);
+      free(searched);
+      free_all_packet_late(begin);
       return 0;
 }

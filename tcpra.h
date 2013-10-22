@@ -29,7 +29,25 @@ int tcp_after_ipv6( const u_char * );
 
 int valid_packet( const u_char * );
 struct tcphdr *get_tcphdr( const u_char * );
-tcp_seq get_sequence_number( const struct tcphdr * );
-tcp_seq get_next_sequence_number( const u_char * , const struct tcphdr * );
+long get_sequence_number( const struct tcphdr * );
+long get_next_sequence_number( const u_char * , const struct tcphdr * );
+int search_lag( pcap_t *, const u_char*, long );
+
+
+typedef struct packet_late
+{
+      long p_sequence;
+      int expected_at;
+      struct packet_late *next;
+      
+} packet_late;
+
+
+packet_late *init_late();
+packet_late *insert_packet_late( packet_late *, long, int );
+packet_late *search_packet_late(packet_late *, packet_late *, long);
+int remove_packet_late( packet_late *, long );
+int free_all_packet_late( packet_late * );
+void print_packet_late(packet_late *);
 
 #endif 

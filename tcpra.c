@@ -98,12 +98,12 @@ struct tcphdr *get_tcphdr( const u_char *packet )
       
 }
 
-tcp_seq get_sequence_number( const struct tcphdr *header )
+long get_sequence_number( const struct tcphdr *header )
 {
       return htonl(header->th_seq);
 }
 
-tcp_seq get_next_sequence_number( const u_char *packet , const struct tcphdr *tcph )
+long get_next_sequence_number( const u_char *packet , const struct tcphdr *tcph )
 {
       u_int8_t offset = tcph->th_off * 4;      
       u_int16_t plen;
@@ -121,4 +121,105 @@ tcp_seq get_next_sequence_number( const u_char *packet , const struct tcphdr *tc
       }
       return get_sequence_number(tcph)+ (plen - offset);
       
+}
+
+int search_lag( pcap_t *pcap_file, const u_char *packet, long sequence)
+{
+      int lag = 0;
+      struct pcap_pkthdr *pktheader = malloc(sizeof(struct pcap_pkthdr));
+      while ((packet != NULL) && (get_sequence_number(get_tcphdr(packet)) != sequence))
+      {
+	    ++lag;
+	    packet = pcap_next(pcap_file, pktheader);
+      }
+      if ( packet == NULL )
+	    return -1;
+	    
+      free(pktheader);
+      return lag;
+}
+
+packet_late *init_late()
+{
+      packet_late *begin = malloc(sizeof(packet_late));
+      begin->p_sequence = 0;
+      begin->expected_at = 0;
+      begin->next = NULL;
+
+      return begin;
+}
+
+
+packet_late *insert_packet_late( packet_late *begin, long p_sequence, int expected_at )
+{
+      packet_late *p;
+      for ( p = begin;
+	    (p->next != NULL) && (p->next->p_sequence < p_sequence);
+	    p = p->next );/*rien*/
+      
+      packet_late *new = malloc(sizeof(packet_late));
+      new->next = p->next;
+      p->next = new;
+      new->p_sequence = p_sequence;
+      new->expected_at = expected_at;
+      return new;
+}
+
+packet_late *search_packet_late(packet_late *dst, packet_late *begin, long p_sequence)
+{
+      packet_late *p;
+      for ( p = begin->next;
+	    p != NULL && p->p_sequence != p_sequence;
+	    p = p->next);/*rien*/
+      
+      if ( p != NULL)
+      {
+	    *dst = *p;
+	    return dst;	    
+      }
+      return NULL;
+      
+}
+
+int remove_packet_late( packet_late *begin, long p_sequence )
+{
+      packet_late *p;
+      for ( p = begin;
+	    (p->next != NULL) && (p->next->p_sequence != p_sequence);
+	    p = p->next );/*rien*/
+      
+      if (p->next == NULL || p->next->p_sequence != p_sequence)
+	    return -1;
+
+      packet_late *tmp = p->next;
+      p->next = p->next->next;
+      free(tmp);
+      return 1;
+      
+}
+
+int free_all_packet_late( packet_late *begin )
+{
+      packet_late *tmp;
+      while ( begin->next != NULL )
+      {
+	    tmp = begin;
+	    begin = begin->next;
+	    free(tmp);
+      }
+      
+      if ( begin->next == NULL ){
+	    free(begin);
+	    return 1;
+      }
+      return -1;
+}
+
+void print_packet_late(packet_late *begin)
+{
+      while ( begin != NULL )
+      {
+	    printf("seq: %ld ... nb: %d\n",begin->p_sequence, begin->expected_at);
+	    begin = begin->next;
+      }
 }
