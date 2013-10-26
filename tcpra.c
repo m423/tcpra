@@ -43,6 +43,59 @@ int ip_after_mac( const u_char *packet )
       return 0;
 }
 
+int verify_daddr( const u_char *packet, const wanted_ip *ipdaddr )
+{
+      switch (ip_after_mac(packet))
+      {
+      case 1:
+	    if (ipdaddr->t_ip != IPV4) break;
+	    return ( get_ipdaddr(packet) == ipdaddr->w_ip.ipv4 );
+      case 2:
+	    if (ipdaddr->t_ip != IPV6) break;
+	    return ( get_ip6daddr(packet) == ipdaddr->w_ip.ipv6 );
+      default:
+	    return 0;
+      }
+      return 0;
+}
+
+u_int32_t get_ipdaddr( const u_char *packet )
+{
+      struct iphdr *header = (struct iphdr *)(packet + ETHER_HDR_LEN);
+      return header->daddr;
+
+}
+
+uint8_t *get_ip6daddr( const u_char *packet )
+{
+      struct ip6_hdr *header = (struct ip6_hdr *)(packet + ETHER_HDR_LEN);
+      return header->ip6_dst.s6_addr;
+
+}
+
+int fix_ipdaddr( const u_char *packet, wanted_ip *ipdaddr )
+{
+      struct tcphdr *tcphdr = get_tcphdr(packet);
+      if ( (tcphdr->th_flags & (TH_SYN | TH_ACK)) == (TH_SYN | TH_ACK) )
+      {
+	    switch(ip_after_mac(packet))
+	    {
+	    case 1:
+		  ipdaddr->t_ip = IPV4;
+		  ipdaddr->w_ip.ipv4 = get_ipdaddr(packet);
+		  return 1;
+	    case 2:
+		  ipdaddr->t_ip = IPV6;
+		  ipdaddr->w_ip.ipv6 = get_ip6daddr(packet);
+		  return 1;
+	    default:
+		  return 0;
+	    }
+	    
+      }
+      return 0;
+}
+
 int tcp_after_ip( const u_char *packet )
 {
       struct iphdr *header = (struct iphdr *)(packet + ETHER_HDR_LEN);
@@ -66,7 +119,7 @@ uint16_t get_ip6_plen( const u_char *packet )
 uint16_t get_ip_plen( const u_char *packet )
 {
       struct iphdr *header = (struct iphdr *)(packet + ETHER_HDR_LEN);
-      return header->tot_len;
+      return (ntohs(header->tot_len) - 4*(header->ihl));
 } 
 
 int valid_packet( const u_char *packet )
@@ -103,7 +156,7 @@ long get_sequence_number( const struct tcphdr *header )
       return htonl(header->th_seq);
 }
 
-long get_next_sequence_number( const u_char *packet , const struct tcphdr *tcph )
+int get_payload_lgt( const u_char *packet , const struct tcphdr *tcph )
 {
       u_int8_t offset = tcph->th_off * 4;      
       u_int16_t plen;
@@ -111,7 +164,7 @@ long get_next_sequence_number( const u_char *packet , const struct tcphdr *tcph 
       switch (ip_after_mac(packet))
       {
       case 1:
-	    plen = htons(get_ip_plen(packet));
+	    plen = get_ip_plen(packet);
 	    break;
       case 2:
 	    plen = htons(get_ip6_plen(packet));
@@ -119,38 +172,27 @@ long get_next_sequence_number( const u_char *packet , const struct tcphdr *tcph 
       default:
 	    return -1;
       }
-      return get_sequence_number(tcph)+ (plen - offset);
-      
+      return (plen - offset);
 }
 
-int search_lag( pcap_t *pcap_file, const u_char *packet, long sequence)
+
+long get_next_sequence_number( const u_char *packet , const struct tcphdr *tcph )
 {
-      int lag = 0;
-      struct pcap_pkthdr *pktheader = malloc(sizeof(struct pcap_pkthdr));
-      while ((packet != NULL) && (get_sequence_number(get_tcphdr(packet)) != sequence))
-      {
-	    ++lag;
-	    packet = pcap_next(pcap_file, pktheader);
-      }
-      if ( packet == NULL )
-	    return -1;
-	    
-      free(pktheader);
-      return lag;
+      return get_sequence_number(tcph)+ get_payload_lgt( packet, tcph);
 }
 
 packet_late *init_late()
 {
       packet_late *begin = malloc(sizeof(packet_late));
       begin->p_sequence = 0;
-      begin->expected_at = 0;
+      begin->expected = 0;
       begin->next = NULL;
 
       return begin;
 }
 
 
-packet_late *insert_packet_late( packet_late *begin, long p_sequence, int expected_at )
+packet_late *insert_packet_late( packet_late *begin, long p_sequence, long expected, int date )
 {
       packet_late *p;
       for ( p = begin;
@@ -161,66 +203,75 @@ packet_late *insert_packet_late( packet_late *begin, long p_sequence, int expect
       new->next = p->next;
       p->next = new;
       new->p_sequence = p_sequence;
-      new->expected_at = expected_at;
+      new->expected = expected;
+      new->date_added = date;
+      printf("ajout de %ld\n", new->p_sequence); 
       return new;
 }
 
-int search_packet_late(packet_late *dst, packet_late *begin, long p_sequence)
+int count_late( packet_late *packet )
 {
-      packet_late *p;
-      for ( p = begin->next;
-	    p != NULL && p->p_sequence != p_sequence;
-	    p = p->next);/*rien*/
-      
-      if ( p != NULL)
+      int late = 0;
+      while ( packet->next != NULL )
       {
-	    *dst = *p;
-	    return 1;	    
+	    ++late;
+	    packet = packet->next;
       }
-      
-      return 0;
-      
+      return late;
 }
 
-int remove_packet_late( packet_late *begin, long p_sequence )
+long clean_packet_late( packet_late *begin , int cpt_pq)
 {
+      int pq_cl = 0;
       packet_late *p;
-      for ( p = begin;
-	    (p->next != NULL) && (p->next->p_sequence != p_sequence);
-	    p = p->next );/*rien*/
-      
-      if (p->next == NULL || p->next->p_sequence != p_sequence)
-	    return -1;
+      packet_late *tmp;
+      if (begin->next == NULL)
+	    return 0;
 
-      packet_late *tmp = p->next;
-      p->next = p->next->next;
-      free(tmp);
-      return 1;
-      
+      p = begin->next;
+
+      if (p->next == NULL)
+	    return 0;
+
+      /* if (p->next != NULL && p->expected != p->next->p_sequence)
+      {
+	    printf("J'ai %ld, je veux %ld, il y a %ld\n",p->p_sequence,p->expected,p->next->p_sequence);
+	    }*/
+
+      if (cpt_pq - p->date_added >= MAX_LATE)
+	    printf("%ld semble perdu et est abandonne\n", p->expected);
+      while ( p->next != NULL && (p->expected == p->next->p_sequence || cpt_pq - p->date_added >= MAX_LATE) )
+      {
+	    begin->next = p->next;
+	    tmp = p;
+	    p = p->next;
+	    printf("Nettoyage de %ld\n",p->p_sequence);
+	    free(tmp);
+	    ++pq_cl;
+      }
+      if (pq_cl>0) printf("nettoyes : %d\n",pq_cl);
+      if (p->next != NULL && p->expected != p->next->p_sequence)
+	    printf("BLOC car : J'ai %ld, je veux %ld, il y a %ld\n",p->p_sequence,p->expected,p->next->p_sequence);
+      return p->p_sequence;
 }
 
 int free_all_packet_late( packet_late *begin )
 {
+      int pq = 0;
       packet_late *tmp;
       while ( begin->next != NULL )
       {
 	    tmp = begin;
 	    begin = begin->next;
+	    printf("suppr: %ld , %ld\n", tmp->p_sequence, tmp->expected);
 	    free(tmp);
+	    ++pq;
       }
       
+      printf("il restait %d\n", pq); 
       if ( begin->next == NULL ){
 	    free(begin);
 	    return 1;
       }
       return -1;
-}
-
-void print_packet_late(packet_late *begin)
-{
-      while ( begin != NULL )
-      {
-	    printf("seq: %ld ... nb: %d\n",begin->p_sequence, begin->expected_at);
-	    begin = begin->next;
-      }
 }

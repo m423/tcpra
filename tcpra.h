@@ -19,6 +19,7 @@
 
 #define IP_HDR_LEN  0x14
 #define IP6_HDR_LEN 0x28
+#define MAX_LATE    250
 
 int verify_pcap( const char * );
 FILE *create_csv_file( const char * );
@@ -27,27 +28,46 @@ int ip_after_mac( const u_char * );
 int tcp_after_ip( const u_char * );
 int tcp_after_ipv6( const u_char * );
 
+enum type_ip {IPV4, IPV6};
+typedef struct wanted_ip
+   {
+   enum type_ip t_ip;
+   union
+      {
+      uint8_t *ipv6;
+      u_int32_t ipv4;
+      } w_ip;
+   } wanted_ip;
+
+int fix_ipdaddr( const u_char *, wanted_ip *);
+int verify_daddr( const u_char *, const wanted_ip * );
+u_int32_t get_ipdaddr( const u_char * );
+uint8_t *get_ip6daddr( const u_char * );
+
+
+
+
 int valid_packet( const u_char * );
 struct tcphdr *get_tcphdr( const u_char * );
+int get_payload_lgt( const u_char *, const struct tcphdr *);
 long get_sequence_number( const struct tcphdr * );
 long get_next_sequence_number( const u_char * , const struct tcphdr * );
-int search_lag( pcap_t *, const u_char*, long );
 
 
 typedef struct packet_late
 {
       long p_sequence;
-      int expected_at;
+      long expected;
+      int date_added;
       struct packet_late *next;
       
 } packet_late;
 
 
 packet_late *init_late();
-packet_late *insert_packet_late( packet_late *, long, int );
-int search_packet_late(packet_late *, packet_late *, long);
-int remove_packet_late( packet_late *, long );
+packet_late *insert_packet_late( packet_late *, long, long, int );
+int count_late( packet_late * );
+long clean_packet_late( packet_late *, int );
 int free_all_packet_late( packet_late * );
-void print_packet_late(packet_late *);
 
 #endif 
