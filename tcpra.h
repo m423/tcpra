@@ -19,10 +19,11 @@
 
 #define IP_HDR_LEN  0x14
 #define IP6_HDR_LEN 0x28
-#define MAX_LATE    250
+#define MAX_LATE    500
 
 int verify_pcap( const char * );
 FILE *create_csv_file( const char * );
+FILE *create_lost_file( const char *, int );
 
 int ip_after_mac( const u_char * );
 int tcp_after_ip( const u_char * );
@@ -65,9 +66,9 @@ typedef struct packet_late
 
 
 packet_late *init_late();
-packet_late *insert_packet_late( packet_late *, long, long, int );
+packet_late *insert_packet_late( packet_late *, long, long, int, size_t );
 int count_late( packet_late * );
-long clean_packet_late( packet_late *, int );
+long clean_packet_late( packet_late *, int, FILE *, int );
 int free_all_packet_late( packet_late * );
 
 #endif 
