@@ -233,74 +233,63 @@ packet_late *init_late()
       packet_late *begin = malloc(sizeof(packet_late));
       begin->p_sequence = 0;
       begin->expected = 0;
-      begin->date_added = 0;
+      begin->payload = 0;
       begin->next = NULL;
 
       return begin;
 }
 
-/* Insere un element dans la liste begin selon p_sequence croissant */
-packet_late *insert_packet_late( packet_late *begin, long p_sequence, long expected, int date, size_t szplate )
-{
-      packet_late *p;
-      for ( p = begin;
-	    (p->next != NULL) && (p->next->p_sequence < p_sequence);
-	    p = p->next );/*rien*/
-      
-      packet_late *new = malloc(szplate);
-      new->next = p->next;
-      p->next = new;
+/* Insere un element dans la liste list*/
+packet_late *save_packet( packet_late *list, long p_sequence, long expected, int pld )
+{     
+      packet_late *new = malloc(sizeof(packet_late));
+      list->next = new;
       new->p_sequence = p_sequence;
-      new->expected = expected;
-      new->date_added = date; 
-      return new;
+      new->expected = expected; 
+      new->payload = pld;
+      new->next = NULL;
+      return list->next;
 }
 
 /* Rend le retard de packet */
-int count_late( packet_late *packet )
+int search( packet_late *packet, long seq, int maxlate)
 {
-      int late = 0;
-      while ( packet->next != NULL )
+      int late;
+      packet_late *tmp;
+      for ( late = 0;
+	    packet->next != NULL
+		  && (packet->next->p_sequence != seq 
+		      || late > maxlate);
+	    packet = packet->next)
       {
 	    ++late;
-	    packet = packet->next;
       }
+
+      if (packet->next == NULL || late > maxlate)
+	    return -1;
+
+      tmp = packet->next;
+      packet->next = packet->next->next;
+      free(tmp);
+      
       return late;
 }
 
-/* Supprime du debut de la liste begin les paquets qui sont consideres comme perdus,
- * ou qui constituent une suite coherente ce qui les rend inutiles pour l'analyse des retards.
- * Rend la plus petite sequence de la liste.
- */
-long clean_packet_late( packet_late *begin , int cpt_pq, FILE* lost, int maxlate )
+int free_first(packet_late *begin, long seq)
 {
-      packet_late *p;
       packet_late *tmp;
+      for( ;
+	   begin->next != NULL && begin->next->p_sequence != seq;
+	   begin = begin->next);
+
       if (begin->next == NULL)
-	    return 0;
+	    return -1;
 
-      p = begin->next;
+      tmp = begin->next;
+      begin->next = begin->next->next;
+      free(tmp);
+      return 0;
 
-      if (p->next == NULL)
-	    return 0;
-
-      while ( p->next != NULL 
-	      && (p->expected == p->next->p_sequence 
-		  || cpt_pq - p->date_added >= maxlate) )
-      {
-	    if ( lost != NULL && p->expected != p->next->p_sequence 
-		 && cpt_pq - p->date_added >= maxlate
- ){
-		  fprintf(lost, "%ld\n", p->expected);
-	    }
-
-	    begin->next = p->next;
-	    tmp = p;
-	    p = p->next;
-	    free(tmp);
-      }
-
-      return p->p_sequence;
 }
 
 /* Supprime la liste begin */
