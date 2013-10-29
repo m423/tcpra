@@ -59,14 +59,13 @@ typedef struct packet_late
 {
       long p_sequence;
       long expected;
-      int payload;
       struct packet_late *next;
       
 } packet_late;
 
 
 packet_late *init_late();
-packet_late* save_packet( packet_late *, long, long, int );
+packet_late* save_packet( packet_late *, long, long );
 int search(packet_late*, long, int);
 int free_first(packet_late *, long);
 int free_all_packet_late( packet_late * );

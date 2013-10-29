@@ -7,20 +7,20 @@
 
 int main(int argc, char **argv)
 {
-      int late = 0;
-      long current_seq_nb = 0;
-      long expected_seq_nb = 0;
-      int pld;
+      int late;
+      long current_seq_nb;
+      long expected_seq_nb;
+      long seq_first;
       wanted_ip *ipdaddr;
 
       packet_late *begin;
-      packet_late *list;
       packet_late* pk;
 
       FILE *csv;
       FILE *lost = NULL;
       char errbuf[PCAP_ERRBUF_SIZE];
       pcap_t *pcap_file;
+
       const u_char *packet;
       struct pcap_pkthdr *pktheader;
       struct tcphdr *tcp_header;
@@ -38,25 +38,23 @@ int main(int argc, char **argv)
 	    case 'm':
 		  maxlate = atoi(optarg);
 		  break;
-	    default: /* '?' */
+	    default:
 		  fprintf(stderr, "Usage: %s [-m maxlate] [-w] cap.pcap\n",
 			  argv[0]);
 		  exit(EXIT_FAILURE);
 	    }
       }
 
+      if ( maxlate < 0 ) maxlate = 0;
       if ( maxlate == 0 ) maxlate = MAX_LATE;
+      /* ---------------------- */
 
-
-
-
-      
-      begin = init_late();
+      /* Initialisation */
       ipdaddr = malloc(sizeof(wanted_ip));
       pktheader = malloc(sizeof(struct pcap_pkthdr));
-      char *filename = argv[argc-1];
-
-
+      char *filename = argv[argc-1]; // le fichier est le dernier argument
+      begin = init_late(); // liste dynamique
+      /* --------------------  */
 	    
       /** On verifie l'extension qui doit etre .pcap **/
       if (!verify_pcap(filename))
@@ -96,28 +94,28 @@ int main(int argc, char **argv)
       }
       
  
-      list = begin;
+      pk = begin;
       while ( (packet = pcap_next(pcap_file, pktheader)) != NULL)
       {
 	    /* Verifie que le paquet a la bonne destination et qu'il transporte des donnees */
-	    if ( ! (verify_daddr(packet, ipdaddr) && get_payload_lgt(packet, get_tcphdr(packet)) != 0) )
+	    if ( ! (verify_daddr(packet, ipdaddr) 
+		    && get_payload_lgt(packet, get_tcphdr(packet)) != 0) )
 		  continue;
 	    
 	    /* Obtient la sequence du packet et celle attendue par la suite */
 	    tcp_header = get_tcphdr(packet);
-	    current_seq_nb = get_sequence_number( tcp_header );
-	    expected_seq_nb = get_next_sequence_number(packet ,tcp_header);
-	    pld = get_payload_lgt(packet, tcp_header);
+	    current_seq_nb = get_sequence_number(tcp_header);
+	    expected_seq_nb = get_next_sequence_number(packet, tcp_header);
 
-	    list = save_packet(list, current_seq_nb, expected_seq_nb, pld);
-	    if (list == NULL){
+	    pk = save_packet(pk, current_seq_nb, expected_seq_nb);
+	    if ( pk == NULL ){
 		  perror("probleme d'ajout a la liste");
 		  exit(EXIT_FAILURE);
 	    }
 	    
       }
 
-      long seq_first;
+      /* Calcule les retards, les ecrits dans le csv et nettoie la liste */
       pk = begin->next;
       while ( pk->next != NULL )
       {
@@ -132,16 +130,11 @@ int main(int argc, char **argv)
 			fprintf(lost, "%ld\n", pk->expected);
 	    }
 	    seq_first = pk->p_sequence;
-	    pld = pk->payload;
-
 	    pk = pk->next;
 	    if ( free_first(begin, seq_first) == -1 )
 	    {
 		  perror("erreur free first");
 	    }
-	    
-	    
-	    
       }
 
       pcap_close(pcap_file);

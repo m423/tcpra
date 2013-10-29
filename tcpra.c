@@ -90,7 +90,6 @@ u_int32_t get_ipdaddr( const u_char *packet )
 {
       struct iphdr *header = (struct iphdr *)(packet + ETHER_HDR_LEN);
       return header->daddr;
-
 }
 
 /* Donne l'ip du destinataire du paquet (ipv6) */
@@ -98,7 +97,6 @@ uint8_t *get_ip6daddr( const u_char *packet )
 {
       struct ip6_hdr *header = (struct ip6_hdr *)(packet + ETHER_HDR_LEN);
       return header->ip6_dst.s6_addr;
-
 }
 
 /*  Si le packet est un SYN-ACK, remplit ipdaddr avec l'ip de destination du packet 
@@ -233,26 +231,24 @@ packet_late *init_late()
       packet_late *begin = malloc(sizeof(packet_late));
       begin->p_sequence = 0;
       begin->expected = 0;
-      begin->payload = 0;
       begin->next = NULL;
 
       return begin;
 }
 
 /* Insere un element dans la liste list*/
-packet_late *save_packet( packet_late *list, long p_sequence, long expected, int pld )
+packet_late *save_packet( packet_late *list, long p_sequence, long expected )
 {     
       packet_late *new = malloc(sizeof(packet_late));
       list->next = new;
       new->p_sequence = p_sequence;
       new->expected = expected; 
-      new->payload = pld;
       new->next = NULL;
       return list->next;
 }
 
-/* Rend le retard de packet */
-int search( packet_late *packet, long seq, int maxlate)
+/* Rend le retard (inferieur a maxlate ou -1) du paquet identifié par seq dans la liste packet */
+int search( packet_late *packet, long seq, int maxlate )
 {
       int late;
       packet_late *tmp;
@@ -275,7 +271,8 @@ int search( packet_late *packet, long seq, int maxlate)
       return late;
 }
 
-int free_first(packet_late *begin, long seq)
+/* Supprime le paquet identifié par seq en debut de la liste begin */
+int free_first( packet_late *begin, long seq )
 {
       packet_late *tmp;
       for( ;
