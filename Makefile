@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-g -Wall -D_BSD_SOURCE
+CFLAGS=-g -Wall -O3 -D_BSD_SOURCE
 LDFLAGS=-lpcap
 EXEC=tcpra
 
