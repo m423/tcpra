@@ -247,11 +247,18 @@ packet_late *save_packet( packet_late *list, long p_sequence, long expected )
       return list->next;
 }
 
-/* Rend le retard (inferieur a maxlate ou -1) du paquet identifié par seq dans la liste packet */
-int search( packet_late *packet, long seq, int maxlate )
+/*
+ * Recherche a partir de packet, le paquet qui a pour sequence seq.
+ * Si le retard est inferieur a maxlate et non nul, on reporte le retard du paquet dans le csv.
+ * Si writelost est vrai et qu'on considere le paquet comme perdu, on reporte la perte dans lost.
+ * La fonction retourne la séquence attendue apres le paquet comportant la séquence seq.
+ * Si le paquet est considere comme perdu, on renvoit 0.
+ */
+long search( packet_late *packet, long seq, int maxlate, FILE *csv, FILE *lost, int writelost )
 {
       int late;
       packet_late *tmp;
+      long ret;
       for ( late = 0;
 	    packet->next != NULL
 		  && (packet->next->p_sequence != seq 
@@ -261,14 +268,22 @@ int search( packet_late *packet, long seq, int maxlate )
 	    ++late;
       }
 
-      if (packet->next == NULL || late > maxlate)
-	    return -1;
+      if (packet->next == NULL || late > maxlate){
+	    if (writelost)
+		  fprintf(lost, "%ld\n", seq);
+	    return 0;
+      }
 
       tmp = packet->next;
+      ret = packet->next->expected;
       packet->next = packet->next->next;
       free(tmp);
       
-      return late;
+      if ( late > 0 )
+      {
+	    fprintf(csv, "%ld, %d\n", seq, late);
+      }
+      return ret;
 }
 
 /* Supprime le paquet identifié par seq en debut de la liste begin */

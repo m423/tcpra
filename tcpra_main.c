@@ -7,14 +7,13 @@
 
 int main(int argc, char **argv)
 {
-      int late;
       long current_seq_nb;
       long expected_seq_nb;
       long seq_first;
       wanted_ip *ipdaddr;
 
       packet_late *begin;
-      packet_late* pk;
+      packet_late* pki;
 
       FILE *csv;
       FILE *lost = NULL;
@@ -45,8 +44,7 @@ int main(int argc, char **argv)
 	    }
       }
 
-      if ( maxlate < 0 ) maxlate = 0;
-      if ( maxlate == 0 ) maxlate = MAX_LATE;
+      if ( maxlate <= 0 ) maxlate = MAX_LATE;
       /* ---------------------- */
 
       /* Initialisation */
@@ -94,7 +92,8 @@ int main(int argc, char **argv)
       }
       
  
-      pk = begin;
+      /* Enregistrement des paquets dans la liste dynamique */
+      pki = begin;
       while ( (packet = pcap_next(pcap_file, pktheader)) != NULL)
       {
 	    /* Verifie que le paquet a la bonne destination et qu'il transporte des donnees */
@@ -107,8 +106,8 @@ int main(int argc, char **argv)
 	    current_seq_nb = get_sequence_number(tcp_header);
 	    expected_seq_nb = get_next_sequence_number(packet, tcp_header);
 
-	    pk = save_packet(pk, current_seq_nb, expected_seq_nb);
-	    if ( pk == NULL ){
+	    pki = save_packet(pki, current_seq_nb, expected_seq_nb);
+	    if ( pki == NULL ){
 		  perror("probleme d'ajout a la liste");
 		  exit(EXIT_FAILURE);
 	    }
@@ -116,21 +115,36 @@ int main(int argc, char **argv)
       }
 
       /* Calcule les retards, les ecrits dans le csv et nettoie la liste */
-      pk = begin->next;
-      while ( pk->next != NULL )
+      pki = begin->next;
+      long seq_j;
+      int cpt = 0;
+      while ( pki->next != NULL )
       {
-	    if (pk->expected != pk->next->p_sequence)
+	    if (pki->expected != pki->next->p_sequence)
 	    {
-		  late = search(pk,pk->expected,maxlate);
-		  if (late > 0){
-			fprintf(csv, "%ld, %d\n", pk->expected, late);
+		  seq_j = pki->expected;
+		  cpt = 0;
 
+		  while( seq_j != pki->next->p_sequence && cpt < maxlate){
+
+			seq_j = search(pki,seq_j,maxlate,csv,lost,writelost);
+			
+			if (seq_j == 0)
+			{
+			      break;
+			}
+
+			++cpt;
 		  }
-		  if (writelost && late == -1)
-			fprintf(lost, "%ld\n", pk->expected);
+		  if (writelost && cpt == maxlate)
+		  {
+			fprintf(lost, "impossible to find the previous of %ld\n", pki->next->p_sequence);
+		  }
 	    }
-	    seq_first = pk->p_sequence;
-	    pk = pk->next;
+
+	    seq_first = pki->p_sequence;
+	    pki = pki->next;
+
 	    if ( free_first(begin, seq_first) == -1 )
 	    {
 		  perror("erreur free first");
